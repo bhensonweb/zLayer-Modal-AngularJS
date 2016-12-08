@@ -11,13 +11,17 @@
 			<div 
 			ng-repeat="i in $uu.zLayer.pages" 
 			uu-zlayer-prep 
-			ng-show="$uu.zLayer.showPage('{{i.$cfg.uuZlayer}}')"><div></div></div>
+			ng-show="$uu.zLayer.showPage('{{i.$cfg.uuZlayer}}')"
+			><div></div></div>
 		</div>
 		<div 
 			 class="zl3" 
 			 style="{{$uu.zLayer.page.$cfg.bottomStyles}}" 
 			 ng-show="$uu.zLayer.page.$cfg.buttons">
-			<b ng-repeat="i in $uu.zLayer.page.$cfg.buttons" uu-zlayer-button="{{i.name}}" ng-style="$uu.zLayer.buttonWidth()" uu-zlayer-style="{{i.style}}">
+			<b 
+			ng-repeat="i in $uu.zLayer.page.$cfg.buttons" 
+			uu-zlayer-button="{{$index}}" 
+			style="background:{{i.background}}; color:{{i.color}}">
 				<span>{{i.label}}</span><s></s>
 			</b>
 		</div>

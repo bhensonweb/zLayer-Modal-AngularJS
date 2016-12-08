@@ -29,14 +29,6 @@ angular.module('zLayer', [])
 				}
 			}
 			
-			if ( this.myStyles )
-			{
-				for ( var i in this.myStyles )
-				{
-					this.styles[i] = this.myStyles[i]
-				}
-			}
-			
 			this.onInitDo()
 		},
 		
@@ -140,51 +132,71 @@ angular.module('zLayer', [])
 				}
 			}
 			
+			/*
+			| Layer Buttons
+			| If provided, parse the buttons property, converting it into an array of properly formatted buttons.
+			| Each button can be a reference to a default button, custom registered button, or a new on-the-fly button.
+			| References to default or registered/custom buttons will inherit all properties of that button.
+			| Those properties can be overridden with unique properties.
+			| Example usage: buttons: ['back']; buttons: ['customRegisteredButton', 'On-The-Fly-Button:$close:red:white']
+			| If defined in layer properties, button action reffers to a function on the layer scope
+			|	This includes default functions like "$back" and the layer's controller functions, if layer has a controller.
+			*/
+			
+			var btns = []
+			
+			if ( pr.buttons )
+			{
+				for ( var i in pr.buttons )
+				{
+					var btn = pr.buttons[i].split(':')
+
+					var obj = {
+						label: btn[0],
+						action: btn[1] || '$back',
+						background: btn[2],
+						color: btn[3],
+					}
+					
+					var tb = this.buttons[btn[0]]
+					
+					if ( tb )
+					{
+						obj.label = tb.label
+						obj.action = obj.action || tb.action
+						obj.background = obj.background || tb.background
+						obj.color = obj.color || tb.color
+					}
+					
+					btns.push(obj)
+				}
+			}
+			
+			pr.buttons = btns
+			
+			//
+			
 			this.page = this.pages[this.pg] = page || this.pages[this.pg] || 
 			{
 				$attr: props,
 				$origID: id,
 				$cfg: pr, 
 				$context: scope,
-				$controller: pr.controller ? this.myControllers[pr.controller] : {},
+				$controller: pr.controller || {},
 				$scope: page ? page.$scope : false
 			}
 			
-			/*if ( pr.buttons )
-			{
-				var btns = pr.buttons
-
-				if ( typeof pr.buttons === 'string' )
-				{
-					btns = pr.buttons.replace(/\s/g, '').split(',')
-				}
-
-				this.page.$cfg.buttons = {}
-
-				for ( var i in btns )
-				{
-					if ( !this.buttons[btns[i]] )
-					{
-						console.error('zLayer: Button: "' + btns[i] + '" does not exist.')
-					}
-					else
-					{
-						this.buttons[btns[i]].name = btns[i]
-						this.page.$cfg.buttons[btns[i]] = this.buttons[btns[i]]
-					}
-				}
-			}*/
-			
 			this.isOpen = true
-			
-			
-			/*if ( !isNew ) 
-			{
-				console.log('re-link')
-				this.link(this.page.$scope, {}, pr)
-			}*/
             
-//            angular.element(document).find('html').addClass('noscroll')
+			scrY = Math.max(document.documentElement.scrollTop, document.body.scrollTop)
+			scrX = Math.max(document.documentElement.scrollLeft, document.body.scrollLeft)
+			
+//			window.scrollTo(scrX, scrY)
+			
+            angular.element(document).find('html')
+//				.css('marginLeft', -scrX+'px')
+//				.css('marginTop', -scrY+'px')
+				.addClass('uu')
             
 			if ( !this.scope.$$phase )
 			{
@@ -214,9 +226,10 @@ angular.module('zLayer', [])
 					label: 'Cancel',
 					action: function()
 					{
-						s.$uu.zLayer.close()
+						s.$uu.zLayer.history.back()
 					},
-					style: 'moduul'
+					background: '',
+					color: ''
 				},
 				back:
 				{
@@ -225,16 +238,18 @@ angular.module('zLayer', [])
 					{
 						s.$uu.zLayer.history.back()
 					},
-					style: 'moduul'
+					background: '',
+					color: ''
 				},
 				ok:
 				{
 					label: 'OK',
 					action: function()
 					{
-						s.$uu.zLayer.close()
+						s.$uu.zLayer.history.back()
 					},
-					style: 'uu_blue'
+					background: '#5a95d9',
+					color: '#fff'
 				}
 			}
 		},
@@ -242,15 +257,6 @@ angular.module('zLayer', [])
 		buttonWidth: function()
 		{
 			return {width: 100 / Object.keys(this.page.$cfg.buttons).length + '%' }
-		},
-		
-		styles:
-		{
-			moduul: {background:'', color:''},
-			uu_red: {background:'#d6223c', color:'#fff'},
-            uu_yellow: {background:'#fcc964', color:'#fff'},
-			uu_green: {background:'#51ae7b ', color:'#fff'},
-			uu_blue: {background:'#5a95d9', color:'#fff'}
 		},
 		
 		loadData: function(s)
@@ -308,7 +314,10 @@ angular.module('zLayer', [])
 		
 		close: function()
 		{
-//            angular.element(document).find('html').removeClass('noscroll')
+            angular.element(document).find('html')
+//				.css('marginLeft', '')
+//				.css('marginTop', '')
+				.removeClass('uu')
 			
 			this.closeDo = false
 			this.closeDelayed = true
@@ -338,23 +347,36 @@ angular.module('zLayer', [])
 		
 		link: function(s, e, a)
 		{
-			var t = this
+			var t = this, p = t.page
 			
-			s = this.page.$scope || s // May need to destroy scope here instead of overriding it with reference to another scope
-			t.page.$scope = s
+			s = p.$scope || s // May need to destroy scope here instead of overriding it with reference to another scope
+			p.$scope = s
 			
-			s.$c = t.page.$context
+			s.$c = p.$context
 			s.$s = s
+			console.log(s)
 			
-			for (var i in t.page.$controller )
+			for (var i in s.LC )
 			{
-				s[i] = t.page.$controller[i]
+				s[i] = s.LC[i]
 			}
 			
 			s.$back = function(){t.history.back() }
 			s.$close = function(){ t.close() }
 			
-			var url = t.page.$cfg.model
+			// Append any passed-in scope data to the scope
+			
+			if ( p.$cfg.inject )
+			{
+				for ( var i in p.$cfg.inject )
+				{
+					s[i] = p.$cfg.inject[i]
+				}
+			}
+			
+			//
+			
+			var url = p.$cfg.model
 			
 			if ( url )
 			{
@@ -372,6 +394,22 @@ angular.module('zLayer', [])
 					
 				})
 			}
+			else
+			{
+				t.update({}, t.pg)
+			}
+		},
+		
+		/* 
+		| Parse malformed JSON object from attribute into proper JSON format and parse into an object
+		| The data passed in from the user is expected to be malformed
+		| Remove potentially malicious code to prevent XSS attacks
+		*/
+		
+		malToJSON: function(s)
+		{
+			s = s.replace(/function/g, '')
+			return JSON.parse( JSON.stringify( eval('('+s+')') ) )
 		}
 	}
 	
@@ -434,13 +472,17 @@ angular.module('zLayer', [])
 		link: function(s, e, a)
 		{
 			e = e.find('div')
-			var t = s.$uu.zLayer.page.$cfg.view
+			
+			var 
+			p = s.$uu.zLayer.page,
+			v = p.$cfg.view,
+			c = p.$cfg.controller
             
-            if ( s.$uu.zLayer.page.$cfg.iframe )
+            if ( p.$cfg.iframe )
             {
-                e.html('<iframe src="'+t+'" style="width:100%; min-height:300px" frameborder="0"></iframe>')
+                e.html('<iframe src="'+v+'" style="width:100%; min-height:300px" frameborder="0"></iframe>')
             }
-			else if ( t.substr(0, 1) === '=' )
+			else if ( v.substr(0, 1) === '=' )
             {
                 e.attr('uu-zlayer-load-literal', '')
             }
@@ -449,7 +491,8 @@ angular.module('zLayer', [])
 				 e.attr('uu-zlayer-load', '')
 			}
             
-			e.attr('data-parent', '$parent')
+			if ( c ) e.attr('ng-controller', c + ' as LC')
+			
 			$c(e)(s)
 		}
 	}
@@ -486,19 +529,9 @@ angular.module('zLayer', [])
 				var id = a.uuZlayer || 'page'+$z.pageIndex
 				a.uuZlayer = id
 				
-				// Parse malformed JSON object from attribute into proper JSON format
-				// Expect attribute to be malformed
-				
 				if ( a.uuOptions )
 				{
-					var n = a.uuOptions.replace(/{|}/g, '').split(',')
-					var o = '{'
-					for ( var i in n )
-					{
-						var s = n[i].split(':')
-						o += '"' + s[0].replace(/'|"|\s/g, '') + '":' + s[1].replace(/'/g, '"') + ','
-					}
-					o = JSON.parse(o.substr(0,o.length-1) + '}')
+					var o = $z.malToJSON(a.uuOptions)
 				}
 				
 				$z.trigger(id, o||a, s)
@@ -524,12 +557,9 @@ angular.module('zLayer', [])
 			return $z.page.$cfg.view
 		},
 		restrict:'A',
-		scope:
-		{
-			$p: '=parent'
-		},
 		link: function(s, e, a)
 		{
+			s.$p = $z.scope
 			$z.link(s, e, a)
 		}
 	}
@@ -540,15 +570,12 @@ angular.module('zLayer', [])
 	return {
 		template: function()
 		{
-			return '<p>' + $z.page.$cfg.view.substr(1) + '</p>'
+			return '<p>' + $z.page.$cfg.view.substr(1).replace(/\[\[/g, '{{').replace(/\]\]/g, '}}') + '</p>'
 		},
 		restrict: 'A',
-		scope:
-		{
-			$p: '=parent'
-		},
 		link: function(s, e, a)
 		{
+			s.$p = $z.scope
 			$z.page.$cfg.cache = 'false'
 			$z.link(s, e, a)
 		}
@@ -565,14 +592,15 @@ angular.module('zLayer', [])
 	}
 })
 
-.directive('uuZlayerButton', function()
+.directive('uuZlayerButton', ['$zLayer', function($z)
 {
 	return {
 		link: function(s, e, a)
 		{
 			var go = function()
 			{
-				s.$uu.zLayer.buttons[a.uuZlayerButton].action()
+				var act = $z.page.$cfg.buttons[a.uuZlayerButton].action
+				typeof act === 'string' ? $z.page.$scope[act]() : act()
 			}
 			
 			e.on('click', go)
@@ -583,26 +611,4 @@ angular.module('zLayer', [])
 			})
 		}
 	}
-})
-
-.directive('uuZlayerStyle', function()
-{
-	return {
-		link: function(s, e, a)
-		{
-			if ( a.uuZlayerStyle === '' ) { return false }
-			
-			var style = s.$uu.zLayer.styles[a.uuZlayerStyle]
-			
-			if ( !style )
-			{
-				console.error('zLayer: Style "' + a.uuZlayerStyle + '" is not defined.')
-			}
-			
-			for ( var i in style )
-			{
-				e[0].style[i] = style[i]
-			}
-		}
-	}
-})
+}])
