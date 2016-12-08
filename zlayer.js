@@ -13,6 +13,7 @@ angular.module('zLayer', ['ngResource'])
 		pages:{},
 		path: angular.element(document.head).html().match(/src=["|'](.*?)zlayer\.js/)[1],
 		trackHistory: true,
+		reg: {},
 		
 		init: function(s)
 		{
@@ -44,12 +45,21 @@ angular.module('zLayer', ['ngResource'])
 			this.onInitDo = f
 		},
 		
+		register: function(id, o)
+		{
+			this.reg[id] = o
+		},
+		
 		history:
 		{
 			a: [],
 			add: function(s)
 			{
 				this.a.unshift(s)
+			},
+			remove: function(s)
+			{
+				
 			},
 			back: function()
 			{
@@ -64,92 +74,110 @@ angular.module('zLayer', ['ngResource'])
 				{
 					this._.close()
 				}
+			},
+			clear: function()
+			{
+				if ( this.c ) return false
+				this.c = true
+				
+				for ( var i in this.a )
+				{
+					this._.pg = this.a[i]
+					this._.page = this._.pages[this.a[i]]
+					this._.close()
+				}
+				
+				this.a = []
+				this.c = false
 			}
 		},
 		
-		trigger: function(s, e, a)
+		trigger: function(id, props, scope)
 		{
+			id = id || 'page' + this.pageIndex
+			
+			if ( id === this.pg ) return false // Prevent layer with same ID from triggering twice in a row.
+			
 			if ( this.isOpen && this.trackHistory )
 			{
 				this.history.add(this.pg)
 			}
 			
-			var attr = a || e || {}
+			pr = Object.create( this.reg[id] || props )
+			pr.id = id
 			
-			this.pg = typeof s === 'string' ? s : attr.id ? attr.id : 'page' + this.pageIndex
+			pr.loadModel = typeof pr.model === 'function' // Cause the Model to load again if speficied as a function
 			
-			attr.templateURL = attr.uuZlayerBind ? attr.uuZlayerBind : attr.href ? attr.href : attr.template
+			// Invoke any properties defined as functions to get their returned value; Only registered properties can be functions
 			
-			if ( !this.scope.$uu.zLayer.pages[this.pg] )
+			for ( var i in pr )
+			{
+				if ( i.search(/\$/) === -1 && i !== 'toJSON' )
+				{
+					pr[i] = typeof pr[i] === 'function' ? pr[i](props) : pr[i]
+				}
+			}
+			
+			this.pg = id
+			
+			if ( !this.pages[id] )
 			{
 				this.pageIndex++
-				
-				attr.id = this.pg
-				
-				this.isOpen = true
-				
-				var c = attr.controller ? this.myControllers[attr.controller] : {}
-				
-				this.page = this.scope.$uu.zLayer.pages[this.pg] = 
-				{
-					$cfg: Object.create(attr), 
-					$context: s,
-					$controller: c
-				}
-				
-				if ( attr.buttons )
-				{
-					var btns = attr.buttons
-					
-					if ( typeof attr.buttons === 'string' )
-					{
-						btns = attr.buttons.replace(/\s/g, '').split(',')
-					}
-					
-					this.page.$cfg.buttons = {}
-					
-					for ( var i in btns )
-					{
-						if ( !this.buttons[btns[i]] )
-						{
-							console.error('zLayer: Button: "' + btns[i] + '" does not exist.')
-						}
-						else
-						{
-							this.buttons[btns[i]].name = btns[i]
-							this.page.$cfg.buttons[btns[i]] = this.buttons[btns[i]]
-						}
-					}
-				}
+				var isNew = true
+				pr.loadModel = true
 			}
 			else
 			{
-				this.page = this.scope.$uu.zLayer.pages[this.pg]
-				this.isOpen = true
+				var isNew = false
 			}
-            
-            this.contentStyle = JSON.parse && typeof attr.contentStyle === 'string' ? JSON.parse(attr.contentStyle) : ( attr.contentStyle || {} )
-            this.boxStyle = JSON.parse && typeof attr.boxStyle === 'string' ? JSON.parse(attr.boxStyle) : ( attr.boxStyle || {} )
-            
-            this.boxStyle.maxWidth = this.boxStyle.width || ( attr.width ? attr.width : '' )
-            this.boxStyle.width = ''
-            
-            this.contentStyle.borderRadius = this.contentStyle.borderRadius || ( attr.buttons ? '' : '0 0 6px 6px' )
-            this.contentStyle.padding = attr.padding || this.contentStyle.padding
-            
-            this.bottomStyles = attr.buttons ? {} : {display:'none'}
-            
-            if ( attr.iframe )
-            {
-                this.contentStyle.padding = '0'
-            }
+			
+			this.page = this.pages[id] = 
+			{
+				$cfg: pr, 
+				$context: scope,
+				$controller: pr.controller ? this.myControllers[pr.controller] : {},
+				$scope: isNew ? {} : this.page.$scope
+			}
+			
+			/*if ( pr.buttons )
+			{
+				var btns = pr.buttons
+
+				if ( typeof pr.buttons === 'string' )
+				{
+					btns = pr.buttons.replace(/\s/g, '').split(',')
+				}
+
+				this.page.$cfg.buttons = {}
+
+				for ( var i in btns )
+				{
+					if ( !this.buttons[btns[i]] )
+					{
+						console.error('zLayer: Button: "' + btns[i] + '" does not exist.')
+					}
+					else
+					{
+						this.buttons[btns[i]].name = btns[i]
+						this.page.$cfg.buttons[btns[i]] = this.buttons[btns[i]]
+					}
+				}
+			}*/
+			
+			this.isOpen = true
+			
+			if ( !isNew ) 
+			{
+				console.log('re-link')
+				this.link(this.page.$scope, {}, pr)
+			}
             
 //            angular.element(document).find('html').addClass('noscroll')
             
-             if ( !this.scope.$$phase )
-            {
-                this.scope.$apply()
-            }
+			if ( !this.scope.$$phase )
+			{
+				this.scope.$apply()
+			}
             
             var fn = function(t) // Prevent double clicks from causing unintended closing
             {
@@ -175,7 +203,8 @@ angular.module('zLayer', ['ngResource'])
 					action: function()
 					{
 						s.$uu.zLayer.close()
-					}
+					},
+					style: 'moduul'
 				},
 				back:
 				{
@@ -262,29 +291,74 @@ angular.module('zLayer', ['ngResource'])
 		
 		showPage: function(p)
 		{
-//			console.log('show page "'+this.pg+'"?')
 			return p === this.pg
 		},
 		
 		close: function()
 		{
-			if ( this.page.$cfg.cache === 'false' )
-			{
-				delete this.scope.$uu.zLayer.pages[this.pg].$scope.$destroy()
-				delete this.scope.$uu.zLayer.pages[this.pg]
-			}
-			
-			this.pg = ''
-			this.isOpen = false
-            
 //            angular.element(document).find('html').removeClass('noscroll')
 			
 			this.closeDo = false
 			this.closeDelayed = true
 			
+			if ( this.page.$scope.onClose )
+			{
+				this.page.$scope.onClose()
+			}
+			
+			if ( this.page.$cfg.cache === 'false' )
+			{
+				this.pages[this.pg].$scope.$destroy()
+				delete this.pages[this.pg]
+			}
+			
+			this.pg = ''
+			this.isOpen = false
+			
+			this.history.clear()
+			
 			if ( !this.scope.$$phase )
 			{
 				this.scope.$apply()
+			}
+		},
+		
+		link: function(s, e, a)
+		{
+			var t = this
+			
+			t.page.$scope = s
+			
+			s.$c = t.page.$context
+			s.$s = s
+			
+			for (var i in t.page.$controller )
+			{
+				s[i] = t.page.$controller[i]
+			}
+			
+			s.$back = function(){t.history.back() }
+			s.$close = function(){ t.close() }
+			
+			var url = t.page.$cfg.model
+			
+			if ( url && t.page.$cfg.loadModel )
+			{
+				t.page.$cfg.loadModel = false
+				
+				t.loadData(url).go({}, function(a)
+				{
+					for ( var i in a )
+					{
+						if ( i.search(/\$/) === -1 && i !== 'toJSON' )
+						{
+							s[i] = a[i]
+						}
+					}
+					
+					t.update({}, t.pg)
+					
+				})
 			}
 		}
 	}
@@ -339,34 +413,30 @@ angular.module('zLayer', ['ngResource'])
 
 .directive('uuZlayerPrep', ['$compile', function($c)
 {
-	// ngRepeat elements always run any directive template functions before repeated elements generate. 
-	// This intermediate directive is needed.
+	/*
+		ngRepeat directive invoke any other directives on the generated elements immediately.
+		This intermediate directive is needed so that this effect does not cause uuZlayerLoad to execute before this directive's link phase.
+	*/
 	
 	return {
 		link: function(s, e, a)
 		{
 			e = e.find('div')
-			
-            var 
-            tmpl = s.$uu.zLayer.page.$cfg.templateURL,
-            isLiteral = tmpl.substr(0, 1) === '='
+			var t = s.$uu.zLayer.page.$cfg.template
             
-            if ( isLiteral )
+            if ( s.$uu.zLayer.page.$cfg.iframe )
             {
-                var str = tmpl.substr(1)
-                e.html('<p>' + str + '</p>')
+                e.html('<iframe src="'+t+'" style="width:100%; min-height:300px" frameborder="0"></iframe>')
             }
-            else if ( s.$uu.zLayer.page.$cfg.iframe )
+			else if ( t.substr(0, 1) === '=' )
             {
-                console.log('iframe mode')
-                e.html('<iframe src="'+tmpl+'" style="width:100%; min-height:300px" frameborder="0"></iframe>')
+                e.attr('uu-zlayer-load-literal', '')
             }
-            else
-            {
-                e.attr('uu-zlayer-load', '')
-            }
+			else
+			{
+				 e.attr('uu-zlayer-load', '')
+			}
             
-			e.attr('ng-show', '$uu.zLayer.showPage(\'{{i.$cfg.id}}\')')
 			e.attr('data-parent', '$parent')
 			$c(e)(s)
 		}
@@ -402,7 +472,7 @@ angular.module('zLayer', ['ngResource'])
 			{
 				ev = ev || event || window.event
 				
-				$z.trigger(s, e, a)
+				$z.trigger(a.uuZlayer, a, s)
 
 				ev.preventDefault()
 			}
@@ -420,50 +490,38 @@ angular.module('zLayer', ['ngResource'])
 .directive('uuZlayerLoad', ['$zLayer', function($z)
 {
 	return {
-		restrict:'A',
 		templateUrl: function()
 		{
-			return $z.page.$cfg.templateURL
+			return $z.page.$cfg.template
 		},
+		restrict:'A',
 		scope:
 		{
 			$p: '=parent'
 		},
 		link: function(s, e, a)
 		{
-			// Configure some scope vars, create controller properties, and load model
-			
-			$z.page.$scope = s
-			
-			s.$c = $z.page.$context
-			s.$s = s
-			
-			for (var i in $z.page.$controller )
-			{
-				s[i] = $z.page.$controller[i]
-			}
-			
-			s.$back = function(){ $z.history.back() }
-			s.$close = function(){ $z.close() }
-			
-			var url = $z.page.$cfg.url
-			
-			if ( url )
-			{
-				$z.loadData(url).go({}, function(a)
-				{
-					for ( var i in a )
-					{
-						if ( i.search(/\$/) === -1 && i !== 'toJSON' )
-						{
-							s[i] = a[i]
-						}
-					}
-					
-					$z.update({}, $z.pg)
-					
-				})
-			}
+			$z.link(s, e, a)
+		}
+	}
+}])
+
+.directive('uuZlayerLoadLiteral', ['$zLayer', function($z)
+{
+	return {
+		template: function()
+		{
+			return '<p>' + $z.page.$cfg.template.substr(1) + '</p>'
+		},
+		restrict: 'A',
+		scope:
+		{
+			$p: '=parent'
+		},
+		link: function(s, e, a)
+		{
+			$z.page.$cfg.cache = 'false'
+			$z.link(s, e, a)
 		}
 	}
 }])
