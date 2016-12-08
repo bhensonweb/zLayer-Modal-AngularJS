@@ -1,4 +1,4 @@
-angular.module('zLayer', ['ngResource'])
+angular.module('zLayer', [])
 
 .factory('$zLayer', ['$compile', '$resource', function($c, $r)
 {
@@ -66,9 +66,7 @@ angular.module('zLayer', ['ngResource'])
 				if ( this.a.length > 0 )
 				{
 					var p = this.a.shift()
-					this._.trackHistory = false
-					this._.trigger( p, this._.pages[p].$cfg )
-					this._.trackHistory = true
+					this._.trigger( p, this._.pages[p].$cfg, this._.pages[p].$context, this._.pages[p])
 				}
 				else
 				{
@@ -92,21 +90,37 @@ angular.module('zLayer', ['ngResource'])
 			}
 		},
 		
-		trigger: function(id, props, scope)
+		open: function(p)
 		{
-			id = id || 'page' + this.pageIndex
+			if ( typeof p === 'string' )
+			{
+				this.trigger(p, {})
+			}
+			else
+			{
+				this.trigger('page'+this.pageIndex, p)
+			}
 			
-			if ( id === this.pg ) return false // Prevent layer with same ID from triggering twice in a row.
-			
-			if ( this.isOpen && this.trackHistory )
+		},
+		
+		trigger: function(id, props, scope, page)
+		{
+			console.log('id: '+id)
+			if ( this.isOpen && !page )
 			{
 				this.history.add(this.pg)
 			}
 			
-			pr = Object.create( this.reg[id] || props )
-			pr.id = id
+			this.pg = this.reg[id] ? 'page'+this.pageIndex : id
+			this.pageIndex++
 			
-			pr.loadModel = typeof pr.model === 'function' // Cause the Model to load again if speficied as a function
+			// Set the ID attribute on the trigger element. 
+			// This will ensure that the element reuses the same layer when reopening, if available.
+			// Also referenced by the zlayer template to know which element to show
+			props.uuZlayer = this.pg
+			console.log('pg:  '+this.pg)
+			
+			pr = Object.create( this.reg[id] || props )
 			
 			// Invoke any properties defined as functions to get their returned value; Only registered properties can be functions
 			
@@ -118,25 +132,22 @@ angular.module('zLayer', ['ngResource'])
 				}
 			}
 			
-			this.pg = id
-			
-			if ( !this.pages[id] )
+			for ( var i in props )
 			{
-				this.pageIndex++
-				var isNew = true
-				pr.loadModel = true
-			}
-			else
-			{
-				var isNew = false
+				if ( i.search(/\$/) === -1 && i !== 'toJSON' )
+				{
+					pr[i] = props[i]
+				}
 			}
 			
-			this.page = this.pages[id] = 
+			this.page = this.pages[this.pg] = page || this.pages[this.pg] || 
 			{
+				$attr: props,
+				$origID: id,
 				$cfg: pr, 
 				$context: scope,
 				$controller: pr.controller ? this.myControllers[pr.controller] : {},
-				$scope: isNew ? {} : this.page.$scope
+				$scope: page ? page.$scope : false
 			}
 			
 			/*if ( pr.buttons )
@@ -166,11 +177,12 @@ angular.module('zLayer', ['ngResource'])
 			
 			this.isOpen = true
 			
-			if ( !isNew ) 
+			
+			/*if ( !isNew ) 
 			{
 				console.log('re-link')
 				this.link(this.page.$scope, {}, pr)
-			}
+			}*/
             
 //            angular.element(document).find('html').addClass('noscroll')
             
@@ -308,6 +320,7 @@ angular.module('zLayer', ['ngResource'])
 			
 			if ( this.page.$cfg.cache === 'false' )
 			{
+				this.page.$attr.uuZlayer = this.page.$origID
 				this.pages[this.pg].$scope.$destroy()
 				delete this.pages[this.pg]
 			}
@@ -327,6 +340,7 @@ angular.module('zLayer', ['ngResource'])
 		{
 			var t = this
 			
+			s = this.page.$scope || s // May need to destroy scope here instead of overriding it with reference to another scope
 			t.page.$scope = s
 			
 			s.$c = t.page.$context
@@ -342,10 +356,8 @@ angular.module('zLayer', ['ngResource'])
 			
 			var url = t.page.$cfg.model
 			
-			if ( url && t.page.$cfg.loadModel )
+			if ( url )
 			{
-				t.page.$cfg.loadModel = false
-				
 				t.loadData(url).go({}, function(a)
 				{
 					for ( var i in a )
@@ -422,7 +434,7 @@ angular.module('zLayer', ['ngResource'])
 		link: function(s, e, a)
 		{
 			e = e.find('div')
-			var t = s.$uu.zLayer.page.$cfg.template
+			var t = s.$uu.zLayer.page.$cfg.view
             
             if ( s.$uu.zLayer.page.$cfg.iframe )
             {
@@ -471,8 +483,25 @@ angular.module('zLayer', ['ngResource'])
 			var go = function(ev)
 			{
 				ev = ev || event || window.event
+				var id = a.uuZlayer || 'page'+$z.pageIndex
+				a.uuZlayer = id
 				
-				$z.trigger(a.uuZlayer, a, s)
+				// Parse malformed JSON object from attribute into proper JSON format
+				// Expect attribute to be malformed
+				
+				if ( a.uuOptions )
+				{
+					var n = a.uuOptions.replace(/{|}/g, '').split(',')
+					var o = '{'
+					for ( var i in n )
+					{
+						var s = n[i].split(':')
+						o += '"' + s[0].replace(/'|"|\s/g, '') + '":' + s[1].replace(/'/g, '"') + ','
+					}
+					o = JSON.parse(o.substr(0,o.length-1) + '}')
+				}
+				
+				$z.trigger(id, o||a, s)
 
 				ev.preventDefault()
 			}
@@ -492,7 +521,7 @@ angular.module('zLayer', ['ngResource'])
 	return {
 		templateUrl: function()
 		{
-			return $z.page.$cfg.template
+			return $z.page.$cfg.view
 		},
 		restrict:'A',
 		scope:
@@ -511,7 +540,7 @@ angular.module('zLayer', ['ngResource'])
 	return {
 		template: function()
 		{
-			return '<p>' + $z.page.$cfg.template.substr(1) + '</p>'
+			return '<p>' + $z.page.$cfg.view.substr(1) + '</p>'
 		},
 		restrict: 'A',
 		scope:
