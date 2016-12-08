@@ -2,16 +2,22 @@ angular.module('zLayer', ['ngResource'])
 
 .factory('$zLayer', ['$compile', '$resource', function($c, $r)
 {
+	var e = angular.element( document.createElement('div') ).attr('uu-zlayer-init', '')
+	angular.element(document.body).append(e)
+	
 	var p = 
 	{
 		name: 'zLayer',
 		pageIndex: 0,
 		onInitDo: function(){},
 		pages:{},
+		path: angular.element(document.head).html().match(/src=["|'](.*?)zlayer\.js/)[1],
+		trackHistory: true,
 		
 		init: function(s)
 		{
 			this.scope = s
+			this.history._ = this
 			this.buttons = this.buttons()
 			
 			if ( this.myButtons )
@@ -30,14 +36,6 @@ angular.module('zLayer', ['ngResource'])
 				}
 			}
 			
-			/*if ( this.myControllers )
-			{
-				for ( var i in this.myControllers )
-				{
-					this.controllers[i] = this.myControllers[i]
-				}
-			}*/
-			
 			this.onInitDo()
 		},
 		
@@ -46,32 +44,58 @@ angular.module('zLayer', ['ngResource'])
 			this.onInitDo = f
 		},
 		
+		history:
+		{
+			a: [],
+			add: function(s)
+			{
+				this.a.unshift(s)
+			},
+			back: function()
+			{
+				if ( this.a.length > 0 )
+				{
+					var p = this.a.shift()
+					this._.trackHistory = false
+					this._.trigger( p, this._.pages[p].$cfg )
+					this._.trackHistory = true
+				}
+				else
+				{
+					this._.close()
+				}
+			}
+		},
+		
 		trigger: function(s, e, a)
 		{
-			var attr = a || e
+			if ( this.isOpen && this.trackHistory )
+			{
+				this.history.add(this.pg)
+			}
 			
-			this.pg = typeof s === 'string' ? s : attr.page ? attr.page : 'page' + this.pageIndex
+			var attr = a || e || {}
 			
-			var controller = attr.controller ? this.myControllers[attr.controller] : false
+			this.pg = typeof s === 'string' ? s : attr.id ? attr.id : 'page' + this.pageIndex
 			
 			attr.templateURL = attr.uuZlayerBind ? attr.uuZlayerBind : attr.href ? attr.href : attr.template
 			
-			if ( !this.scope['$uu_'+this.pg] )
+			if ( !this.scope.$uu.zLayer.pages[this.pg] )
 			{
 				this.pageIndex++
 				
-				attr.page = this.pg
+				attr.id = this.pg
 				
 				this.isOpen = true
 				
-				this.page = this.scope['$uu_'+this.pg] = 
+				var c = attr.controller ? this.myControllers[attr.controller] : {}
+				
+				this.page = this.scope.$uu.zLayer.pages[this.pg] = 
 				{
-					$uu: '$uu_'+this.pg, 
 					$cfg: Object.create(attr), 
 					$context: s,
-					$controller: controller
+					$controller: c
 				}
-				this.pages[this.pg] = this.page
 				
 				if ( attr.buttons )
 				{
@@ -100,7 +124,7 @@ angular.module('zLayer', ['ngResource'])
 			}
 			else
 			{
-				this.page = this.scope['$uu_'+this.pg]
+				this.page = this.scope.$uu.zLayer.pages[this.pg]
 				this.isOpen = true
 			}
             
@@ -120,27 +144,23 @@ angular.module('zLayer', ['ngResource'])
                 this.contentStyle.padding = '0'
             }
             
-            angular.element(document).find('html').addClass('noscroll')
+//            angular.element(document).find('html').addClass('noscroll')
             
              if ( !this.scope.$$phase )
             {
                 this.scope.$apply()
             }
             
-            var timerCapsule = function(t)
+            var fn = function(t) // Prevent double clicks from causing unintended closing
             {
-                t.closeOnClickTimer = setInterval(function()
+				t.closeDelayed = true
+				
+                t.timer = setInterval(function()
                 {
-                    clearInterval(t.closeOnClickTimer)
-                    t.closeOnClick = true
+                    clearInterval(t.timer)
+                    t.closeDelayed = false
                 }, 300)
             }(this)
-			
-			
-			if ( !attr.templateURL )
-			{
-				console.error('zLayer: Must specify a template (HTML partial) to load. Use one of the following properties/attributes: "href", "uu-zlayer-bind", "data-template".')
-			}
 			
 		},
 		
@@ -151,15 +171,24 @@ angular.module('zLayer', ['ngResource'])
 			return {
 				cancel:
 				{
-					label: "Cancel",
+					label: 'Cancel',
 					action: function()
 					{
 						s.$uu.zLayer.close()
 					}
 				},
+				back:
+				{
+					label: 'Back',
+					action: function()
+					{
+						s.$uu.zLayer.history.back()
+					},
+					style: 'moduul'
+				},
 				ok:
 				{
-					label: "OK",
+					label: 'OK',
 					action: function()
 					{
 						s.$uu.zLayer.close()
@@ -202,29 +231,27 @@ angular.module('zLayer', ['ngResource'])
 				return false
 			}
 			
+			p = p || this.pg
+			
+			var pg = this.scope.$uu.zLayer.pages[p]
+			
+			if ( !pg )
+			{
+				console.error('zLayer: update() - Invalid ID provided.', '"', p, '"')
+				return false
+			}
+			
 			for ( var k in o )
 			{
-				if ( p )
+				if ( pg )
 				{
-					if ( this.scope['$uu_'+p] )
-					{
-						this.scope['$uu_'+p][k] = o[k]
-					}
-				}
-				else
-				{
-					this.page[k] = o[k]
+					pg.$scope[k] = o[k]
 				}
 			}
 			
-			if ( this.page.$controller )
+			if ( pg.$scope.init )
 			{
-				this.page.$controller.$scope = this.page
-				
-				if ( this.page.$controller.init )
-				{
-					this.page.$controller.init()
-				}
+				pg.$scope.init()
 			}
 			
 			if ( !this.scope.$$phase )
@@ -243,15 +270,17 @@ angular.module('zLayer', ['ngResource'])
 		{
 			if ( this.page.$cfg.cache === 'false' )
 			{
-				console.log('removing '+this.pg)
-				delete this.pages[this.pg]
-				delete this.scope['$uu_'+this.pg]
+				delete this.scope.$uu.zLayer.pages[this.pg].$scope.$destroy()
+				delete this.scope.$uu.zLayer.pages[this.pg]
 			}
 			
 			this.pg = ''
 			this.isOpen = false
             
-            angular.element(document).find('html').removeClass('noscroll')
+//            angular.element(document).find('html').removeClass('noscroll')
+			
+			this.closeDo = false
+			this.closeDelayed = true
 			
 			if ( !this.scope.$$phase )
 			{
@@ -263,15 +292,16 @@ angular.module('zLayer', ['ngResource'])
 	return p
 }])
 
-.directive('uuZlayer', ['$zLayer', function($z)
+.directive('uuZlayerInit', ['$zLayer', function($z)
 {
 	return {
         replace:true,
-		templateUrl: '../0.9.0/zlayer.html',
+		templateUrl: $z.path + 'zlayer.html',
 		link: function(s, e)
 		{
 			s.$uu = s.$uu ? s.$uu : {}
 			s.$uu.zLayer = $z
+			s.$uu.zLayer.pages = {}
 			
 			angular.element(document).on('keydown', function(ev)
 			{
@@ -289,12 +319,16 @@ angular.module('zLayer', ['ngResource'])
 				}
 			})
 			
-			e.on('click', function()
+			e.on('mousedown', function()
 			{
-				if ( $z.closeOnClick && $z.page.$cfg.clickOutsideClose !== 'false' )
+				$z.closeDo = true
+			})
+			
+			e.on('mouseup', function()
+			{
+				if ( $z.closeDo && !$z.closeDelayed && $z.page.$cfg.clickOutsideClose !== 'false' )
 				{
 					$z.close()
-					$z.closeOnClick = false
 				}
 			})
 			
@@ -332,38 +366,34 @@ angular.module('zLayer', ['ngResource'])
                 e.attr('uu-zlayer-load', '')
             }
             
-			e.attr('ng-show', '$uu.zLayer.showPage(\'{{i.$cfg.page}}\')')
-			e.attr('data-uu', '$uu_'+s.$uu.zLayer.pg)
-			e.attr('data-context', '$uu_'+s.$uu.zLayer.pg+'.$context')
+			e.attr('ng-show', '$uu.zLayer.showPage(\'{{i.$cfg.id}}\')')
 			e.attr('data-parent', '$parent')
-			e.attr('data-controller', '$uu_'+s.$uu.zLayer.pg+'.$controller')
 			$c(e)(s)
 		}
 	}
 }])
 
-.directive('uuZlayerCloseclick', ['$zLayer', function($z)
+.directive('uuZlayerClosestopper', ['$zLayer', function($z)
 {
 	return {
 		link: function(s, e)
 		{
-			var b
-			
-			e.on('mouseenter', function()
+			e.on('mousedown', function(ev)
 			{
-                clearInterval($z.closeOnClickTimer)
-				$z.closeOnClick = false
+				$z.closeDo = false
+				ev.stopPropagation()
 			})
 			
-			e.on('mouseleave', function()
+			e.on('mouseup', function(ev)
 			{
-				$z.closeOnClick = true
+				$z.closeDo = true
+				ev.stopPropagation()
 			})
 		}
 	}
 }])
 
-.directive('uuZlayerBind', ['$zLayer', function($z)
+.directive('uuZlayer', ['$zLayer', function($z)
 {
 	return {
 		link: function(s, e, a)
@@ -393,18 +423,28 @@ angular.module('zLayer', ['ngResource'])
 		restrict:'A',
 		templateUrl: function()
 		{
-			return $z.isOpen ? $z.page.$cfg.templateURL : 'zlayer/LICENSE.txt'
+			return $z.page.$cfg.templateURL
 		},
 		scope:
 		{
-			uu: '=',
-			$c: '=context',
-			$p: '=parent',
-			$t: '=controller'
+			$p: '=parent'
 		},
 		link: function(s, e, a)
 		{
-			// load page data here
+			// Configure some scope vars, create controller properties, and load model
+			
+			$z.page.$scope = s
+			
+			s.$c = $z.page.$context
+			s.$s = s
+			
+			for (var i in $z.page.$controller )
+			{
+				s[i] = $z.page.$controller[i]
+			}
+			
+			s.$back = function(){ $z.history.back() }
+			s.$close = function(){ $z.close() }
 			
 			var url = $z.page.$cfg.url
 			
@@ -412,17 +452,16 @@ angular.module('zLayer', ['ngResource'])
 			{
 				$z.loadData(url).go({}, function(a)
 				{
-					var o = {}
-					
 					for ( var i in a )
 					{
 						if ( i.search(/\$/) === -1 && i !== 'toJSON' )
 						{
-							o[i] = a[i]
+							s[i] = a[i]
 						}
 					}
 					
-					$z.update(o, $z.pg)
+					$z.update({}, $z.pg)
+					
 				})
 			}
 		}
@@ -434,7 +473,7 @@ angular.module('zLayer', ['ngResource'])
 	return {
 		link: function(s, e)
 		{
-			e.on('click', function(){ s.$uu.zLayer.close() })
+			e.on('mousedown', function(){ s.$uu.zLayer.close() })
 		}
 	}
 })
