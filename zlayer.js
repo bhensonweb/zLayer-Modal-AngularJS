@@ -1,3 +1,10 @@
+/*!
+ * VERSION: 0.9.4
+ * DATE: 2016-12-08
+ * 
+ * @author: Brandon Henson, bhenson.web@gmail.com
+ */
+
 angular.module('zLayer', [])
 
 .factory('$zLayer', ['$compile', '$resource', function($c, $r)
