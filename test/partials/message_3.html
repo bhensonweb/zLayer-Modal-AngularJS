@@ -1,0 +1,14 @@
+<p ng-hide="complete">Backup {{backup}} to {{device}}?</p>
+<p ng-show="complete">Backup complete</p>
+<p>Passed to scope: {{specialBehavior}}</p>
+
+<ul>
+	<li ng-repeat="item in $p.items"
+		uu-zlayer="editItem"
+		data-title="Edit: {{item.name}}">
+		{{item.name}} ({{this.backup}})
+	</li>
+</ul>
+
+<a href="#" ng-click="anotherScopeTest()">Call controller function</a>
+

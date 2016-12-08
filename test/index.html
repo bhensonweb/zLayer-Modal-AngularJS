@@ -1,0 +1,154 @@
+<!doctype html>
+<html ng-app="app" ng-controller="myApp">
+<head>
+<title>zLayer Angular Dev</title>
+
+<meta charset="UTF-8"><!-- UTF-8, ISO-8859-1 -->
+<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0" />
+
+<link href="../themes/moduul.us.css" rel="stylesheet" />
+
+<script src="angular.js"></script>
+<script src="angular-resource.js"></script>
+<script src="angular-animate.js"></script>
+<script src="greensock/minified/TweenLite.min.js"></script>
+<script src="greensock/minified/plugins/CSSPlugin.min.js"></script>
+<script src="../zlayer.js"></script>
+<!--<script src="../zlayer.min.js"></script>-->
+<script src="script.js"></script>
+    
+<style>
+    
+	html{/*overflow-x:scroll;*/}
+	body{height:500px; /*width:133.33%;*/}
+    
+    .box{
+    display:inline-block;
+    box-sizing: border-box;
+    vertical-align: top;
+    width:33.33%;
+    height:50%;
+    text-align:center;}
+    
+    .box *{
+    color:white;}
+    
+    s{display:inline-block; height:100%; vertical-align: middle;}
+</style>
+
+</head>
+
+<body>
+	
+    <div class="box" style="background-color:#555">
+        <a 
+           href="#shouldBePrevented"
+		   uu-zlayer
+           data-view="=Are you sure you want to create a local backup of the internets?" 
+           data-title="Please Confirm" 
+           data-model="pageData.json" 
+		   data-class="customClass" 
+		   data-outer-styles="width:200px; border:1px solid blue; border-radius:0"
+		   data-inner-styles="background:pink"
+		   data-bottom-styles="background:green"
+		   data-top-styles="background:black; color:white">
+            Instance Styles Test
+        </a>
+		<p 
+		uu-zlayer="myFirstRegister" 
+		data-title-extra="Test 1" 
+		data-model="pageData.json" 
+		data-cache="false"
+		preload="true">
+			Register Test 1 (No Cache)
+		</p>
+		
+		<p uu-zlayer="myFirstRegister" data-title="Test 2" data-model="pageData2.json">
+			Register Test 2
+		</p>
+		
+		<p uu-zlayer="mySecondRegister">
+			Register Test 3
+		</p>
+		
+		<p uu-zlayer="mySecondRegister">
+			Register Test 4
+		</p>
+		
+    </div><div class="box" style="background-color:#333">
+        <p 
+		   uu-zlayer
+           data-view="partials/message_3.html"
+           data-model="pageData.json" data-class="customClass">
+            Another Test
+        </p>
+		<p 
+		   uu-zlayer
+		   uu-options="{
+		   view:'partials/message_3.html', 
+		   model:'pageData.json', 
+		   title:'Option attribute', 
+		   class:'customClass'
+		   }">
+            Attr Options
+        </p>
+		<p 
+		   uu-zlayer
+		   uu-options="{
+		   view:'partials/message_3.html', 
+		   model:'pageData.json', 
+		   title:'Option attribute', 
+		   class:'customClass',
+			controller:'TestController'
+		   }"
+		   uu-inject="{specialBehavior:'Cool Mode', forController:'data passed via attribute'}">
+			Pass To Scope Test
+		</p>
+    </div><div class="box" style="background-color:#ccc">
+		<p uu-zlayer uu-options="{view:'=Buttons Test', buttons:['back:btnClick:red:white', 'ok', 'New Button:btnClick:green:white', 'custom'], controller:'TestController'}">
+			Buttons Test
+		</p>
+    </div><div class="box" style="background-color:#bbb">
+        <p 
+		   uu-zlayer
+           data-view="partials/scrolltest.html"
+           data-outer-styles="width:500px">
+            Scrolling Test
+        </p>
+		<p 
+		   uu-zlayer
+           data-view="partials/scrolltest.html"
+           data-outer-styles="width:500px"
+		   data-preload="true">
+            Preload Test
+        </p>
+		<p 
+		uu-zlayer 
+		uu-options="{view:'partials/message_4.html', controller:'LayerController', title:'Layer Controller', inject:{scopeData: 'Hello from the scope'}}">
+			Regular Controller Test + Inject Test
+		</p>
+		<p 
+			uu-zlayer 
+		   	uu-options="{view:'=[[scopeData]]', controller:'LayerController', title:'Layer Controller', inject:{scopeData: 'Hello from the scope'} }">
+			Regular Controller Test
+		</p>
+    </div><div class="box" style="background-color:#aaa">
+        <b 
+		   uu-zlayer
+           data-view="partials/nopadding.html"
+           data-outer-styles="width:500px; padding:0">
+            No Padding Test &amp; Custom Styles
+        </b>
+    </div><div class="box" style="background-color:#999">
+        <b 
+		   uu-zlayer
+           data-view="iframe.html"
+		   data-outer-styles="width:800px"
+		   data-inner-styles="padding:0"
+           data-iframe="true">
+            iFrame
+        </b>
+    </div><s></s>
+	
+</body>
+</html><!-- <( 0o) -->
