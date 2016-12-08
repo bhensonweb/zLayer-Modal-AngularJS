@@ -1,16 +1,22 @@
 <div class="zlM" ng-show="$uu.zLayer.isOpen">
-	<div class="zlB" ng-style="$uu.zLayer.boxStyle" uu-zlayer-closestopper>
-		<div class="zl1">
+	<div class="zlB" style="{{$uu.zLayer.page.$cfg.outerStyles}}" uu-zlayer-closestopper>
+		<div class="zl1" style="{{$uu.zLayer.page.$cfg.topStyles}}">
 			<div class="zlT">
 				{{$uu.zLayer.page.$cfg.title}}
 			</div><div class="zlC" uu-zlayer-close>
 				<span>&times;</span><s></s>
 			</div><s></s>
 		</div>
-		<div class="zl2" ng-style="$uu.zLayer.contentStyle">
-			<div ng-repeat="i in $uu.zLayer.pages" uu-zlayer-prep><div></div></div>
+		<div class="zl2" style="{{$uu.zLayer.page.$cfg.innerStyles}}">
+			<div 
+				 ng-repeat="i in $uu.zLayer.pages" 
+				 uu-zlayer-prep 
+				 ng-show="$uu.zLayer.showPage('{{i.$cfg.id}}')" ><div></div></div>
 		</div>
-		<div class="zl3" ng-style="$uu.zLayer.bottomStyles">
+		<div 
+			 class="zl3" 
+			 style="{{$uu.zLayer.page.$cfg.bottomStyles}}" 
+			 ng-show="$uu.zLayer.page.$cfg.buttons">
 			<b ng-repeat="i in $uu.zLayer.page.$cfg.buttons" uu-zlayer-button="{{i.name}}" ng-style="$uu.zLayer.buttonWidth()" uu-zlayer-style="{{i.style}}">
 				<span>{{i.label}}</span><s></s>
 			</b>
